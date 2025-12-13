@@ -1,4 +1,4 @@
-import 'dart:convert';
+import 'dart:developer';
 import 'dart:io';
 
 class TcpService {
@@ -17,6 +17,7 @@ class TcpService {
 
   void send(String jsonData) {
     if (_socket != null) {
+      log('Sending payload: $jsonData');
       _socket!.write(jsonData + "\n");
     }
   }
