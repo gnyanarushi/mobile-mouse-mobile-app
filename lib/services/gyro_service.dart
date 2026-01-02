@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:sensors_plus/sensors_plus.dart';
 
 class GyroService {
@@ -11,7 +12,7 @@ class GyroService {
   }
 
   void _startListening() {
-    gyroscopeEvents.listen((event) {
+    gyroscopeEventStream().listen((event) {
       _gyroController.add(event);
     });
   }
