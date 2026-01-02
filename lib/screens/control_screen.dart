@@ -41,6 +41,7 @@ class _ControlScreenState extends State<ControlScreen>
   bool _showMouseTab = true;
   bool _useWebSocket = true; // Default to WebSocket
   bool _isFullscreen = false;
+  Offset? _touchPosition; // Track touch position on trackpad
   Uint8List? _currentFrame;
   StreamSubscription<sensors.GyroscopeEvent>? _gyroSub;
   StreamSubscription<Uint8List>? _frameSub;
@@ -257,6 +258,15 @@ class _ControlScreenState extends State<ControlScreen>
 
   void _handlePadUpdate(DragUpdateDetails details) {
     mouseController.sendMovement(details.delta.dx, details.delta.dy);
+    setState(() {
+      _touchPosition = details.localPosition;
+    });
+  }
+
+  void _handlePadEnd(DragEndDetails details) {
+    setState(() {
+      _touchPosition = null;
+    });
   }
 
   void _handleLeftClick() {
@@ -285,69 +295,79 @@ class _ControlScreenState extends State<ControlScreen>
 
     // Show fullscreen streaming view
     if (_isFullscreen) {
-      return Scaffold(
-        backgroundColor: Colors.black,
-        body: Stack(
-          children: [
-            // Fullscreen streaming view
-            Center(
-              child: _currentFrame != null
-                  ? InteractiveViewer(
-                      panEnabled: true,
-                      minScale: 0.5,
-                      maxScale: 3.0,
-                      child: Image.memory(
-                        _currentFrame!,
-                        fit: BoxFit.contain,
-                        gaplessPlayback: true,
-                      ),
-                    )
-                  : Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_isStreaming) ...[
-                          const CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.white,
+      return PopScope(
+        canPop: false,
+        onPopInvoked: (didPop) {
+          if (!didPop) {
+            setState(() {
+              _isFullscreen = false;
+            });
+          }
+        },
+        child: Scaffold(
+          backgroundColor: Colors.black,
+          body: Stack(
+            children: [
+              // Fullscreen streaming view
+              Center(
+                child: _currentFrame != null
+                    ? InteractiveViewer(
+                        panEnabled: true,
+                        minScale: 0.5,
+                        maxScale: 3.0,
+                        child: Image.memory(
+                          _currentFrame!,
+                          fit: BoxFit.contain,
+                          gaplessPlayback: true,
+                        ),
+                      )
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_isStreaming) ...[
+                            const CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Waiting for frames...',
-                            style: TextStyle(color: Colors.white70),
-                          ),
-                        ] else ...[
-                          Icon(
-                            Icons.screen_share_outlined,
-                            size: 64,
-                            color: Colors.grey.shade700,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Start streaming to view desktop',
-                            style: TextStyle(color: Colors.grey.shade600),
-                          ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Waiting for frames...',
+                              style: TextStyle(color: Colors.white70),
+                            ),
+                          ] else ...[
+                            Icon(
+                              Icons.screen_share_outlined,
+                              size: 64,
+                              color: Colors.grey.shade700,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Start streaming to view desktop',
+                              style: TextStyle(color: Colors.grey.shade600),
+                            ),
+                          ],
                         ],
-                      ],
-                    ),
-            ),
-            // Exit fullscreen button (top-right)
-            Positioned(
-              top: MediaQuery.of(context).padding.top + 8,
-              right: 8,
-              child: IconButton(
-                icon: const Icon(Icons.fullscreen_exit),
-                color: Colors.white,
-                iconSize: 32,
-                onPressed: () {
-                  setState(() {
-                    _isFullscreen = false;
-                  });
-                },
-                style: IconButton.styleFrom(backgroundColor: Colors.black54),
+                      ),
               ),
-            ),
-          ],
+              // Exit fullscreen button (top-right)
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 8,
+                right: 8,
+                child: IconButton(
+                  icon: const Icon(Icons.fullscreen_exit),
+                  color: Colors.white,
+                  iconSize: 32,
+                  onPressed: () {
+                    setState(() {
+                      _isFullscreen = false;
+                    });
+                  },
+                  style: IconButton.styleFrom(backgroundColor: Colors.black54),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -577,6 +597,7 @@ class _ControlScreenState extends State<ControlScreen>
           const SizedBox(height: 8),
           GestureDetector(
             onPanUpdate: _handlePadUpdate,
+            onPanEnd: _handlePadEnd,
             child: Container(
               height: 200,
               decoration: BoxDecoration(
@@ -595,12 +616,34 @@ class _ControlScreenState extends State<ControlScreen>
                   ),
                 ],
               ),
-              child: const Center(
-                child: Text(
-                  'Swipe here to move cursor',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.black54, fontSize: 16),
-                ),
+              child: Stack(
+                children: [
+                  const Center(
+                    child: Text(
+                      'Swipe here to move cursor',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.black54, fontSize: 16),
+                    ),
+                  ),
+                  // Touch indicator
+                  if (_touchPosition != null)
+                    Positioned(
+                      left: _touchPosition!.dx - 15,
+                      top: _touchPosition!.dy - 15,
+                      child: Container(
+                        width: 30,
+                        height: 30,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: colorScheme.primary.withOpacity(0.3),
+                          border: Border.all(
+                            color: colorScheme.primary,
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
